@@ -54,6 +54,12 @@ SERIES = {
 SERIES_ID = list(SERIES.values())
 
 FREQUENCY = 'q'
+AGGREGATION_METHOD = 'avg'
+REALTIME_START='1940-01-01'
+OUTPUT_TYPE_REALTIME = 1
+OUTPUT_TYPE_VINTAGE_ALL = 2
+OUTPUT_TYPE_NEW_AND_REVISED = 3
+OUTPUT_TYPE_FIRST_RELEASE = 4
 
 CACHE_LOCATION = os.path.expanduser('~/.forecastingGDP.cache.csv')
 
@@ -67,8 +73,40 @@ def __load_data():
     '''returns data from FRED API'''
     data = {}
     for series_id in SERIES_ID:
-        data[series_id] = FRED.get_series(series_id, frequency=FREQUENCY)
+        series = __load_series(series_id)
+        series_first_release = __load_series_first_release(series_id)
+        if series_first_release is None: # SP500 does not have first release information
+            series_first_release = series
+        data[series_id] = series
+        data[series_id+'_first_release'] = series_first_release
     return pd.DataFrame(data)
+
+def __load_series(series_id):
+    '''returns the series of ID `series_id` with a quarter frequency'''
+    return FRED.get_series(
+        series_id,
+        frequency=FREQUENCY,
+        aggregation_method=AGGREGATION_METHOD,
+        output_type=OUTPUT_TYPE_REALTIME,
+    )
+
+def __load_series_first_release(series_id):
+    '''returns the series of ID `series_id` with a quarter frequency
+    at the time it was first released, or None if such information is
+    not available'''
+
+    assert AGGREGATION_METHOD == 'avg'
+    try:
+        # NOTE: frequency cannot be used when requesting first release
+        # (output_type=4), data must be aggregated by quarter manually
+        # using `mean`.
+        return FRED.get_series(
+            series_id,
+            realtime_start=REALTIME_START,
+            output_type=OUTPUT_TYPE_FIRST_RELEASE,
+        ).resample('QS-Jan').mean()
+    except ValueError:
+        return None
 
 def __load_cache():
     '''returns data cached locally at `CACHE_LOCATION` otherwise cache it from FRED API'''
