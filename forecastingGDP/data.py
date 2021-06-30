@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 
 from fredapi import Fred
 
@@ -41,6 +42,7 @@ SERIES = {
     'Exports_Goods_Services':'IEAXGS',
     'Imports_Goods_from_China':'IMPCH',
 
+
     'BofA_US_High_Yield_Index':'BAMLH0A0HYM2',
     'S&P_500':'SP500',
     'VIX_Volatility':'VIXCLS',
@@ -53,11 +55,33 @@ SERIES_ID = list(SERIES.values())
 
 FREQUENCY = 'q'
 
+CACHE_LOCATION = os.path.expanduser('~/.forecastingGDP.cache.csv')
+
 FRED = Fred()
 
-def get_data():
+def get_data(use_cache=False):
     '''returns a dataframe with GDP related series'''
+    return __load_cache() if use_cache else __load_data()
+
+def __load_data():
+    '''returns data from FRED API'''
     data = {}
     for series_id in SERIES_ID:
         data[series_id] = FRED.get_series(series_id, frequency=FREQUENCY)
     return pd.DataFrame(data)
+
+def __load_cache():
+    '''returns data cached locally at `CACHE_LOCATION` otherwise cache it from FRED API'''
+    try:
+        return pd.read_csv(CACHE_LOCATION, index_col=0, parse_dates=[0])
+    except FileNotFoundError:
+        data = __load_data()
+        data.to_csv(CACHE_LOCATION)
+        return data
+
+def clear_cache():
+    '''clears data cached locally at `CACHE_LOCATION` if any'''
+    try:
+        os.remove(CACHE_LOCATION)
+    except FileNotFoundError:
+        pass
