@@ -53,13 +53,14 @@ SERIES = {
 
 SERIES_ID = list(SERIES.values())
 
-FREQUENCY = 'q'
 AGGREGATION_METHOD = 'avg'
-REALTIME_START='1940-01-01'
+FREQUENCY = 'q'
+OBSERVATION_START='1947-01-01'
+OUTPUT_TYPE_FIRST_RELEASE = 4
+OUTPUT_TYPE_NEW_AND_REVISED = 3
 OUTPUT_TYPE_REALTIME = 1
 OUTPUT_TYPE_VINTAGE_ALL = 2
-OUTPUT_TYPE_NEW_AND_REVISED = 3
-OUTPUT_TYPE_FIRST_RELEASE = 4
+REALTIME_START='1940-01-01'
 
 CACHE_LOCATION = os.path.expanduser('~/.forecastingGDP.cache.csv')
 
@@ -86,6 +87,7 @@ def __load_series(series_id):
     return FRED.get_series(
         series_id,
         frequency=FREQUENCY,
+        observation_start=OBSERVATION_START,
         aggregation_method=AGGREGATION_METHOD,
         output_type=OUTPUT_TYPE_REALTIME,
     )
@@ -102,6 +104,7 @@ def __load_series_first_release(series_id):
         # using `mean`.
         return FRED.get_series(
             series_id,
+            observation_start=OBSERVATION_START,
             realtime_start=REALTIME_START,
             output_type=OUTPUT_TYPE_FIRST_RELEASE,
         ).resample('QS-Jan').mean()
