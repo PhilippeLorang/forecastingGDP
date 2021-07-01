@@ -126,3 +126,9 @@ def clear_cache():
         os.remove(CACHE_LOCATION)
     except FileNotFoundError:
         pass
+
+def first_release_selector(data):
+    return data.columns.str.endswith('_first_release')
+
+def without_first_release(data):
+    return data.loc[:, ~first_release_selector(data)]
