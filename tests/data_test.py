@@ -8,7 +8,7 @@ def test_get_data():
     data_cached = get_data(use_cache=True)
     assert isfile(CACHE_LOCATION)
     assert len(data) > 0
-    assert data.shape[1] == len(SERIES_ID)
+    assert data.shape[1] == len(SERIES_ID)*2
     assert data.shape == data_cached.shape
     assert data.index.dtype == data_cached.index.dtype
     assert_array_equal(data.dtypes, data_cached.dtypes)
