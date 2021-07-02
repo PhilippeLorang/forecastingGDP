@@ -64,6 +64,7 @@ OUTPUT_TYPE_VINTAGE_ALL = 2
 REALTIME_START='1940-01-01'
 
 CACHE_LOCATION = os.path.expanduser('~/.forecastingGDP.cache.csv')
+CACHE_INFO_LOCATION = os.path.expanduser('~/.forecastingGDP_info.cache.csv')
 
 FRED = Fred()
 
@@ -75,12 +76,15 @@ def get_data(use_cache=False, include_first_release=False):
     data = __load_cache() if use_cache else __load_data()
     return data if include_first_release else except_first_release(data)
 
+def get_data_info(use_cache=False):
+    return __load_cache_info() if use_cache else __load_data_info()
+
 def __load_data():
     '''Returns data from FRED API'''
     data = {}
     for series_id in SERIES_ID:
-        series = __load_series(series_id)
-        series_first_release = __load_series_first_release(series_id)
+        series = get_series(series_id)
+        series_first_release = get_series_first_release(series_id)
         if series_first_release is None: # SP500 does not have first release information
             series_first_release = series.copy()
         # else:
@@ -92,7 +96,11 @@ def __load_data():
         data[first_release_series_id(series_id)] = series_first_release
     return pd.DataFrame(data)
 
-def __load_series(series_id):
+def __load_data_info():
+    '''Returns data series description from FRED API'''
+    return pd.concat([get_series_info(series_id) for series_id in SERIES_ID], axis=1).T.set_index('id')
+
+def get_series(series_id):
     '''Returns the series of ID `series_id` with a quarter frequency'''
     return FRED.get_series(
         series_id,
@@ -102,7 +110,7 @@ def __load_series(series_id):
         output_type=OUTPUT_TYPE_REALTIME,
     )
 
-def __load_series_first_release(series_id):
+def get_series_first_release(series_id):
     '''Returns the series of ID `series_id` with a quarter frequency
     at the time it was first released, or None if such information is
     not available'''
@@ -121,6 +129,10 @@ def __load_series_first_release(series_id):
     except ValueError:
         return None
 
+def get_series_info(series_id):
+    '''Returns a one row dataframe that describes the series `series_id`.'''
+    return FRED.get_series_info(series_id)
+
 def __load_cache():
     '''Returns data cached locally at `CACHE_LOCATION` otherwise cache it from FRED API'''
     try:
@@ -130,12 +142,22 @@ def __load_cache():
         data.to_csv(CACHE_LOCATION)
         return data
 
-def clear_cache():
-    '''Clears data cached locally at `CACHE_LOCATION` if any'''
+def __load_cache_info():
+    '''Returns data description cached locally at `CACHE_INFO_LOCATION` otherwise cache it from FRED API'''
     try:
-        os.remove(CACHE_LOCATION)
+        return pd.read_csv(CACHE_INFO_LOCATION, index_col=0)
     except FileNotFoundError:
-        pass
+        info = __load_data_info()
+        info.to_csv(CACHE_INFO_LOCATION)
+        return info
+
+def clear_cache():
+    '''Clears data cached locally if any'''
+    for cache in [CACHE_LOCATION, CACHE_INFO_LOCATION]:
+        try:
+            os.remove(cache)
+        except FileNotFoundError:
+            pass
 
 def first_release_series_id(series_id):
     '''Returns the ID of the first released values of a given series'''
