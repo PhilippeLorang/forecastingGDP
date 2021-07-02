@@ -4,8 +4,8 @@ from numpy.testing import assert_array_equal
 from forecastingGDP.data import CACHE_LOCATION, SERIES_ID, clear_cache, get_data
 
 def test_get_data():
-    data = get_data(use_cache=True)
-    data_cached = get_data(use_cache=True)
+    data = get_data(use_cache=True, include_first_release=True)
+    data_cached = get_data(use_cache=True, include_first_release=True)
     assert isfile(CACHE_LOCATION)
     assert len(data) > 0
     assert data.shape[1] == len(SERIES_ID)*2

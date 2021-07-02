@@ -52,6 +52,7 @@ SERIES = {
 }
 
 SERIES_ID = list(SERIES.values())
+FIRST_RELEASE_SUFFIX='_first_release'
 
 AGGREGATION_METHOD = 'avg'
 FREQUENCY = 'q'
@@ -66,24 +67,33 @@ CACHE_LOCATION = os.path.expanduser('~/.forecastingGDP.cache.csv')
 
 FRED = Fred()
 
-def get_data(use_cache=False):
-    '''returns a dataframe with GDP related series'''
-    return __load_cache() if use_cache else __load_data()
+def get_data(use_cache=False, include_first_release=False):
+    '''Returns a dataframe with GDP related series
+    Uses cached CSV at `CACHE_LOCATION` when use_cache is True.
+    Includes first release series when include_first_release is True.
+    '''
+    data = __load_cache() if use_cache else __load_data()
+    return data if include_first_release else except_first_release(data)
 
 def __load_data():
-    '''returns data from FRED API'''
+    '''Returns data from FRED API'''
     data = {}
     for series_id in SERIES_ID:
         series = __load_series(series_id)
         series_first_release = __load_series_first_release(series_id)
         if series_first_release is None: # SP500 does not have first release information
-            series_first_release = series
+            series_first_release = series.copy()
+        # else:
+        #     # filling first release NaN with revised values
+        #     temp = series.copy()
+        #     temp.loc[series_first_release.index] = series_first_release
+        #     series_first_release = temp
         data[series_id] = series
-        data[series_id+'_first_release'] = series_first_release
+        data[first_release_series_id(series_id)] = series_first_release
     return pd.DataFrame(data)
 
 def __load_series(series_id):
-    '''returns the series of ID `series_id` with a quarter frequency'''
+    '''Returns the series of ID `series_id` with a quarter frequency'''
     return FRED.get_series(
         series_id,
         frequency=FREQUENCY,
@@ -93,7 +103,7 @@ def __load_series(series_id):
     )
 
 def __load_series_first_release(series_id):
-    '''returns the series of ID `series_id` with a quarter frequency
+    '''Returns the series of ID `series_id` with a quarter frequency
     at the time it was first released, or None if such information is
     not available'''
 
@@ -112,7 +122,7 @@ def __load_series_first_release(series_id):
         return None
 
 def __load_cache():
-    '''returns data cached locally at `CACHE_LOCATION` otherwise cache it from FRED API'''
+    '''Returns data cached locally at `CACHE_LOCATION` otherwise cache it from FRED API'''
     try:
         return pd.read_csv(CACHE_LOCATION, index_col=0, parse_dates=[0])
     except FileNotFoundError:
@@ -121,14 +131,23 @@ def __load_cache():
         return data
 
 def clear_cache():
-    '''clears data cached locally at `CACHE_LOCATION` if any'''
+    '''Clears data cached locally at `CACHE_LOCATION` if any'''
     try:
         os.remove(CACHE_LOCATION)
     except FileNotFoundError:
         pass
 
-def first_release_selector(data):
-    return data.columns.str.endswith('_first_release')
+def first_release_series_id(series_id):
+    '''Returns the ID of the first released values of a given series'''
+    return f'{series_id}{FIRST_RELEASE_SUFFIX}'
 
-def without_first_release(data):
+def first_release_selector(data):
+    return data.columns.str.endswith(FIRST_RELEASE_SUFFIX)
+
+def except_first_release(data):
+    '''Returns the data excluding first release series.'''
     return data.loc[:, ~first_release_selector(data)]
+
+def only_first_release(data):
+    '''Returns the data excluding revised series.'''
+    return data.loc[:, first_release_selector(data)]
