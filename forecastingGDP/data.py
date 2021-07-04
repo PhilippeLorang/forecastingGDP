@@ -12,7 +12,8 @@ SERIES = {
     #'manuf_ISM':'ISM'
 
     'Manufacturers_New_Orders':'AMTMNO',
-    'New_Orders_Non_defense_capital_good_ex_air':'NEWORDER',
+    'New_Orders_Durable_Good':'DGORDER', #updated
+    #'New_Orders_Non_defense_capital_good_ex_air':'NEWORDER',
     #'Building_permits'
     #'Housing_Starts'
     #'Construction Spending'
@@ -24,10 +25,10 @@ SERIES = {
 
     'Advance_Retail_Sales':'MARTSMPCSM44000USS',
     'Real_Disposable_Personal_Income':'DSPIC96',
-    'Personal_Consumption_Expenditure':'PCEC96',
+    'Personal_Consumption_Expenditure':'PCE',# old PCEC96
 
     #Initial Jobless Claims
-    'Unemployment_Rate':'UNRATE',
+    'Unemployment_Rate':'U1RATE',#old  UNRATE
     'Employment_Leve':'CE16OV',
     'Non_farm_payroll':'PAYEMS',
     'Not in Labor Force':'LNU05026648',
@@ -38,16 +39,20 @@ SERIES = {
     'Producer_Price_Index':'PPIACO',
     #'Oil Price'
     #'Unit Labour Cost'
-    'Imports_Goods_Services':'IEAMGSN',
-    'Exports_Goods_Services':'IEAXGS',
+    # 'Imports_Goods_Services':'IEAMGSN',
+    # 'Exports_Goods_Services':'IEAXGS',
+    'Imports_Goods_Services':'IMPGSC1',#updated
+    'Exports_Goods_Services':'EXPGSC1',#updated
+
     'Imports_Goods_from_China':'IMPCH',
 
 
     'BofA_US_High_Yield_Index':'BAMLH0A0HYM2',
     'S&P_500':'SP500',
+    'Wilshire_5000_Market_Cap':'WILL5000INDFC',#updated  
     'VIX_Volatility':'VIXCLS',
-    '10YUST':'DGS10',
-    '10YUST_2YUST':'T10Y2Y',
+    '10YUST':'GS10', # old DGS10
+    '10YUST_2YUST':'GS2',#old T10Y2Y
     'US_Dollar Index':'DTWEXAFEGS',
 }
 
