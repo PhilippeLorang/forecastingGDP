@@ -59,14 +59,15 @@ SERIES = {
 SERIES_ID = list(SERIES.values())
 FIRST_RELEASE_SUFFIX='_first_release'
 
-FREQUENCY='MS' # Monthly, beginning of the month
+FREQUENCY = 'MS' # Monthly, beginning of the month
 AGGREGATION_METHOD = 'avg'
-OBSERVATION_START='1971-01-01'
+OBSERVATION_START = '1971-01-01'
+OBSERVATION_END = '2021-01-01'
 OUTPUT_TYPE_FIRST_RELEASE = 4
 OUTPUT_TYPE_NEW_AND_REVISED = 3
 OUTPUT_TYPE_REALTIME = 1
 OUTPUT_TYPE_VINTAGE_ALL = 2
-REALTIME_START='1940-01-01'
+REALTIME_START = '1940-01-01'
 
 CACHE_LOCATION = os.path.expanduser('~/.forecastingGDP.cache.csv')
 CACHE_INFO_LOCATION = os.path.expanduser('~/.forecastingGDP_info.cache.csv')
@@ -111,6 +112,7 @@ def get_series(series_id):
     return FRED.get_series(
         series_id,
         observation_start=OBSERVATION_START,
+        observation_end=OBSERVATION_END,
         aggregation_method=AGGREGATION_METHOD,
         output_type=OUTPUT_TYPE_REALTIME,
     )
@@ -120,12 +122,10 @@ def get_series_first_release(series_id):
     at the time it was first released, or None if such information is
     not available'''
     try:
-        # NOTE: frequency cannot be used when requesting first release
-        # (output_type=4), data must be aggregated by quarter manually
-        # using `mean`.
         return FRED.get_series(
             series_id,
             observation_start=OBSERVATION_START,
+            observation_end=OBSERVATION_END,
             realtime_start=REALTIME_START,
             output_type=OUTPUT_TYPE_FIRST_RELEASE,
         )
