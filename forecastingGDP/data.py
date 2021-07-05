@@ -49,7 +49,7 @@ SERIES = {
 
     'BofA_US_High_Yield_Index':'BAMLH0A0HYM2',
     'S&P_500':'SP500',
-    'Wilshire_5000_Market_Cap':'WILL5000INDFC',#updated  
+    'Wilshire_5000_Market_Cap':'WILL5000INDFC',#updated
     'VIX_Volatility':'VIXCLS',
     '10YUST':'GS10', # old DGS10
     '10YUST_2YUST':'GS2',#old T10Y2Y
@@ -59,9 +59,9 @@ SERIES = {
 SERIES_ID = list(SERIES.values())
 FIRST_RELEASE_SUFFIX='_first_release'
 
+FREQUENCY='MS' # Monthly, beginning of the month
 AGGREGATION_METHOD = 'avg'
-FREQUENCY = 'q'
-OBSERVATION_START='1947-01-01'
+OBSERVATION_START='1971-01-01'
 OUTPUT_TYPE_FIRST_RELEASE = 4
 OUTPUT_TYPE_NEW_AND_REVISED = 3
 OUTPUT_TYPE_REALTIME = 1
@@ -73,13 +73,14 @@ CACHE_INFO_LOCATION = os.path.expanduser('~/.forecastingGDP_info.cache.csv')
 
 FRED = Fred()
 
-def get_data(use_cache=False, include_first_release=False):
+def get_data(frequency=FREQUENCY, use_cache=False, include_first_release=False):
     '''Returns a dataframe with GDP related series
     Uses cached CSV at `CACHE_LOCATION` when use_cache is True.
     Includes first release series when include_first_release is True.
     '''
     data = __load_cache() if use_cache else __load_data()
-    return data if include_first_release else except_first_release(data)
+    data = data if include_first_release else except_first_release(data)
+    return resample_series(data, frequency)
 
 def get_data_info(use_cache=False):
     return __load_cache_info() if use_cache else __load_data_info()
@@ -106,21 +107,18 @@ def __load_data_info():
     return pd.concat([get_series_info(series_id) for series_id in SERIES_ID], axis=1).T.set_index('id')
 
 def get_series(series_id):
-    '''Returns the series of ID `series_id` with a quarter frequency'''
+    '''Returns the series of ID `series_id` with its 'natural' frequency'''
     return FRED.get_series(
         series_id,
-        frequency=FREQUENCY,
         observation_start=OBSERVATION_START,
         aggregation_method=AGGREGATION_METHOD,
         output_type=OUTPUT_TYPE_REALTIME,
     )
 
 def get_series_first_release(series_id):
-    '''Returns the series of ID `series_id` with a quarter frequency
+    '''Returns the series of ID `series_id` with its 'natural' frequency
     at the time it was first released, or None if such information is
     not available'''
-
-    assert AGGREGATION_METHOD == 'avg'
     try:
         # NOTE: frequency cannot be used when requesting first release
         # (output_type=4), data must be aggregated by quarter manually
@@ -130,7 +128,7 @@ def get_series_first_release(series_id):
             observation_start=OBSERVATION_START,
             realtime_start=REALTIME_START,
             output_type=OUTPUT_TYPE_FIRST_RELEASE,
-        ).resample('QS-Jan').mean()
+        )
     except ValueError:
         return None
 
@@ -178,3 +176,7 @@ def except_first_release(data):
 def only_first_release(data):
     '''Returns the data excluding revised series.'''
     return data.loc[:, first_release_selector(data)]
+
+def resample_series(series, frequency):
+    '''Returns a series or dataframe resampled to the wanted frequency'''
+    return series.resample(frequency).mean().interpolate()
