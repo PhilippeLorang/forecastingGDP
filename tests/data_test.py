@@ -1,12 +1,12 @@
 from os.path import isfile
 from numpy.testing import assert_array_equal
 
-from forecastingGDP.data import CACHE_LOCATION, CACHE_INFO_LOCATION, SERIES_ID, clear_cache, get_data, get_data_info
+from forecastingGDP.data import cache_location, CACHE_INFO_LOCATION, SERIES_ID, clear_cache, get_data, get_data_info
 
 def test_get_data():
     data = get_data(use_cache=True, include_first_release=True)
     data_cached = get_data(use_cache=True, include_first_release=True)
-    assert isfile(CACHE_LOCATION)
+    assert isfile(cache_location())
     assert len(data) > 0
     assert data.shape[1] == len(SERIES_ID)*2
     assert data.shape == data_cached.shape
@@ -42,9 +42,9 @@ def test_get_data():
 #     )
 
 def test_clear_cache():
-    if not isfile(CACHE_LOCATION):
+    if not isfile(cache_location()):
         get_data(use_cache=True)
-    assert isfile(CACHE_LOCATION)
+    assert isfile(cache_location())
     clear_cache()
-    assert not isfile(CACHE_LOCATION)
+    assert not isfile(cache_location())
     assert not isfile(CACHE_INFO_LOCATION)

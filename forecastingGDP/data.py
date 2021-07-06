@@ -163,7 +163,7 @@ def __load_cache_info():
         info.to_csv(CACHE_INFO_LOCATION)
         return info
 
-def cache_location(frequency):
+def cache_location(frequency=FREQUENCY):
     return os.path.expanduser(f'~/.forecastingGDP.{frequency}.cache.csv')
 
 def cache_locations():
