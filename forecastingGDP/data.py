@@ -59,17 +59,20 @@ SERIES = {
 SERIES_ID = list(SERIES.values())
 FIRST_RELEASE_SUFFIX='_first_release'
 
-FREQUENCY = 'MS' # Monthly, beginning of the month
-AGGREGATION_METHOD = 'avg'
+FREQUENCY = 'm' # Monthly, beginning of the month
+FREQUENCIES = ['w', 'm', 'q'] # supported frequencies
+
 OBSERVATION_START = '1971-01-01'
-OBSERVATION_END = '2021-01-01'
-OUTPUT_TYPE_FIRST_RELEASE = 4
-OUTPUT_TYPE_NEW_AND_REVISED = 3
+OBSERVATION_END = '2021-04-01'
+
 OUTPUT_TYPE_REALTIME = 1
 OUTPUT_TYPE_VINTAGE_ALL = 2
+OUTPUT_TYPE_NEW_AND_REVISED = 3
+OUTPUT_TYPE_FIRST_RELEASE = 4
 REALTIME_START = '1940-01-01'
 
-CACHE_LOCATION = os.path.expanduser('~/.forecastingGDP.cache.csv')
+UPSCALING_METHOD='ffill'
+
 CACHE_INFO_LOCATION = os.path.expanduser('~/.forecastingGDP_info.cache.csv')
 
 FRED = Fred()
@@ -79,19 +82,19 @@ def get_data(frequency=FREQUENCY, use_cache=False, include_first_release=False):
     Uses cached CSV at `CACHE_LOCATION` when use_cache is True.
     Includes first release series when include_first_release is True.
     '''
-    data = __load_cache() if use_cache else __load_data()
-    data = data if include_first_release else except_first_release(data)
-    return resample_series(data, frequency)
+    assert frequency in FREQUENCIES
+    data = __load_cache(frequency) if use_cache else __load_data(frequency)
+    return data if include_first_release else except_first_release(data)
 
 def get_data_info(use_cache=False):
     return __load_cache_info() if use_cache else __load_data_info()
 
-def __load_data():
+def __load_data(frequency):
     '''Returns data from FRED API'''
     data = {}
     for series_id in SERIES_ID:
-        series = get_series(series_id)
-        series_first_release = get_series_first_release(series_id)
+        series = get_series(series_id, frequency)
+        series_first_release = get_series_first_release(series_id, frequency)
         if series_first_release is None: # SP500 does not have first release information
             series_first_release = series.copy()
         # else:
@@ -107,27 +110,32 @@ def __load_data_info():
     '''Returns data series description from FRED API'''
     return pd.concat([get_series_info(series_id) for series_id in SERIES_ID], axis=1).T.set_index('id')
 
-def get_series(series_id):
+def get_series(series_id, frequency=FREQUENCY):
     '''Returns the series of ID `series_id` with its 'natural' frequency'''
-    return FRED.get_series(
-        series_id,
-        observation_start=OBSERVATION_START,
-        observation_end=OBSERVATION_END,
-        aggregation_method=AGGREGATION_METHOD,
-        output_type=OUTPUT_TYPE_REALTIME,
+    return resample_series(
+        FRED.get_series(
+            series_id,
+            observation_start=OBSERVATION_START,
+            observation_end=OBSERVATION_END,
+            output_type=OUTPUT_TYPE_REALTIME,
+        ),
+        frequency,
     )
 
-def get_series_first_release(series_id):
+def get_series_first_release(series_id, frequency=FREQUENCY):
     '''Returns the series of ID `series_id` with its 'natural' frequency
     at the time it was first released, or None if such information is
     not available'''
     try:
-        return FRED.get_series(
-            series_id,
-            observation_start=OBSERVATION_START,
-            observation_end=OBSERVATION_END,
-            realtime_start=REALTIME_START,
-            output_type=OUTPUT_TYPE_FIRST_RELEASE,
+        return resample_series(
+            FRED.get_series(
+                series_id,
+                observation_start=OBSERVATION_START,
+                observation_end=OBSERVATION_END,
+                realtime_start=REALTIME_START,
+                output_type=OUTPUT_TYPE_FIRST_RELEASE,
+            ),
+            frequency,
         )
     except ValueError:
         return None
@@ -136,13 +144,14 @@ def get_series_info(series_id):
     '''Returns a one row dataframe that describes the series `series_id`.'''
     return FRED.get_series_info(series_id)
 
-def __load_cache():
+def __load_cache(frequency):
     '''Returns data cached locally at `CACHE_LOCATION` otherwise cache it from FRED API'''
+    cache = cache_location(frequency)
     try:
-        return pd.read_csv(CACHE_LOCATION, index_col=0, parse_dates=[0])
+        return pd.read_csv(cache, index_col=0, parse_dates=[0])
     except FileNotFoundError:
-        data = __load_data()
-        data.to_csv(CACHE_LOCATION)
+        data = __load_data(frequency)
+        data.to_csv(cache)
         return data
 
 def __load_cache_info():
@@ -154,9 +163,15 @@ def __load_cache_info():
         info.to_csv(CACHE_INFO_LOCATION)
         return info
 
+def cache_location(frequency):
+    return os.path.expanduser(f'~/.forecastingGDP.{frequency}.cache.csv')
+
+def cache_locations():
+    return [cache_location(frequency) for frequency in FREQUENCIES]
+
 def clear_cache():
     '''Clears data cached locally if any'''
-    for cache in [CACHE_LOCATION, CACHE_INFO_LOCATION]:
+    for cache in cache_locations() + [CACHE_INFO_LOCATION]:
         try:
             os.remove(cache)
         except FileNotFoundError:
@@ -179,4 +194,47 @@ def only_first_release(data):
 
 def resample_series(series, frequency):
     '''Returns a series or dataframe resampled to the wanted frequency'''
-    return series.resample(frequency).mean().interpolate()
+    freq_src = guess_series_frequency(series)
+    freq_cmp = compare_freq(frequency, freq_src)
+    if freq_cmp > 0:
+        return downsample_series(series, frequency)
+    if freq_cmp < 0:
+        return upsample_series(series, frequency)
+    return series
+
+def downsample_series(series, frequency):
+    return series.resample(freq_to_pd_fred(frequency)).mean()
+
+def upsample_series(series, frequency):
+    # Forward filling avoids data leakage: time or linear
+    # interpolation would result in a data leak.
+    return series.resample(freq_to_pd_fred(frequency)).interpolate(method=UPSCALING_METHOD)
+
+__FREQUENCY_CONVERSION = {
+    'w': 'W-Fri',
+    'm': 'MS',
+    'q': 'QS-Jan',
+}
+
+__FREQUENCY_ORDER = ['d', 'w', 'm', 'q']
+
+def guess_series_frequency(series):
+    return pd_freq_to_freq(pd.infer_freq(series.index) or 'd') # BAMLH0A0HYM2
+
+def freq_to_pd_fred(frequency):
+    return __FREQUENCY_CONVERSION[frequency]
+
+def pd_freq_to_freq(frequency):
+    frequency = frequency.lower()
+    if frequency.startswith('q'):
+        return 'q'
+    if frequency.startswith('m'):
+        return 'm'
+    if frequency.startswith('d') or frequency.startswith('b'):
+        return 'd'
+    if frequency.startswith('w'):
+        return 'w'
+    return None
+
+def compare_freq(frequency_1, frequency_2):
+    return __FREQUENCY_ORDER.index(frequency_1) - __FREQUENCY_ORDER.index(frequency_2)
